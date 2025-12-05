@@ -1,11 +1,8 @@
 'use client';
-
 import { useState } from 'react';
 import Link from 'next/link';
-
 export default function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-
     return (
         <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md shadow-sm">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -22,7 +19,6 @@ export default function Header() {
                             <p className="text-xs text-gray-500 dark:text-gray-400">Taiwan News Aggregator</p>
                         </div>
                     </Link>
-
                     {/* Hamburger Menu Button */}
                     <button
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -54,7 +50,6 @@ export default function Header() {
                     </button>
                 </div>
             </div>
-
             {/* Mobile Dropdown Menu */}
             {isMenuOpen && (
                 <div className="absolute top-16 left-0 right-0 bg-white dark:bg-gray-900 shadow-lg border-t border-gray-200 dark:border-gray-700">
@@ -79,6 +74,13 @@ export default function Header() {
                             onClick={() => setIsMenuOpen(false)}
                         >
                             評估方法
+                        </Link>
+                        <Link
+                            href="/disclaimer"
+                            className="block py-3 px-4 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                            onClick={() => setIsMenuOpen(false)}
+                        >
+                            免責聲明
                         </Link>
                     </nav>
                 </div>
