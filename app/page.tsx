@@ -36,18 +36,16 @@ function HomePageContent() {
                 ? await fetchNewsTopics()
                 : await fetchFirebaseByCategory(selectedCategory);
             
-            if (realTopics.length > 0) {
-                setTopics(realTopics);
-                setUsingRealData(true);
-                setLoading(false);
-                return;
-            }
+            // USE REAL DATA (Even if empty array)
+            // This prevents mock data from appearing when db is empty
+            setTopics(realTopics);
+            setUsingRealData(true);
+            setLoading(false);
+            return;
         }
         
-        // Fallback to mock data if Firebase not set up or empty
-        console.log('Using mock data (Firebase not configured or empty)');
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
+        // ONLY use mock data if Firebase keys are missing/invalid
+        console.log('Using mock data (Firebase not configured)');
         const mockTopics = selectedCategory === '全部'
             ? getAllTopics()
             : getTopicsByCategory(selectedCategory);
@@ -62,8 +60,8 @@ function HomePageContent() {
     };
     loadData();
   }, [selectedCategory]);
-  // --- FILTERING LOGIC START ---
-  // 1. Filter out topics with 1 source
+  // --- FILTERING LOGIC ---
+  // 1. Filter out topics with 1 source (Aggregator Rule)
   const validTopics = topics.filter(t => t.sourceCount > 1);
   // 2. Sort the filtered topics
   const sortedTopics = [...validTopics].sort((a, b) => {
@@ -73,7 +71,6 @@ function HomePageContent() {
       return b.sourceCount - a.sourceCount;
     }
   });
-  // --- FILTERING LOGIC END ---
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Header />
@@ -86,8 +83,6 @@ function HomePageContent() {
                 <button
                   key={cat}
                   onClick={() => {
-                     // In a real app with searchParams, you'd push router
-                     // For now, simpler state update for immediate feedback
                      if (typeof window !== 'undefined') {
                          const url = new URL(window.location.href);
                          if (cat === '全部') url.searchParams.delete('category');
@@ -121,7 +116,7 @@ function HomePageContent() {
         {/* Filter & Sort Bar */}
         <div className="flex justify-between items-center mb-6">
           <div className="text-sm text-gray-500 dark:text-gray-400">
-             顯示 {sortedTopics.length} 個主題
+             顯示 {sortedTopics.length} 個聚合主題
              {usingRealData && <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Live Data</span>}
           </div>
           
@@ -151,8 +146,16 @@ function HomePageContent() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-             目前沒有符合條件的新聞主題
+          <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+             <div className="text-4xl mb-4">📭</div>
+             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                目前沒有符合條件的新聞主題
+             </h3>
+             <p className="text-gray-500 dark:text-gray-400">
+                {selectedCategory !== '全部' 
+                   ? '此分類目前沒有多方報導的熱門話題，請稍後再來。' 
+                   : '正在等待新聞更新，或目前沒有值得聚合的多源新聞。'}
+             </p>
           </div>
         )}
       </main>
