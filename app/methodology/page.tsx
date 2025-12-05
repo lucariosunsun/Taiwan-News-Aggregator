@@ -1,15 +1,11 @@
 'use client';
-
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
-
 export default function MethodologyPage() {
     const router = useRouter();
-
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
             <Header />
-
             <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 {/* Page Title */}
                 <div className="text-center mb-12">
@@ -20,7 +16,6 @@ export default function MethodologyPage() {
                         Our Methodology
                     </p>
                 </div>
-
                 {/* Intro */}
                 <section className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-8">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
@@ -30,14 +25,59 @@ export default function MethodologyPage() {
                         本平台的媒體偏見分類參考了國際知名的 <strong>Media Bias/Fact Check (MBFC)</strong> 方法論，並結合台灣獨特的政治光譜進行在地化調整。我們的目標不是標籤化媒體，而是提供讀者一個參考架構，幫助理解新聞報導背後的潛在觀點。
                     </p>
                 </section>
-
+                {/* Data Sources Section */}
+                <section className="mb-12">
+                    <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6">
+                        資料來源 (Data Sources)
+                    </h2>
+                    <div className="grid md:grid-cols-3 gap-6">
+                        {/* Pan-Green */}
+                        <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-lg border border-green-100 dark:border-green-800">
+                            <h3 className="text-lg font-bold text-green-700 dark:text-green-400 mb-4 flex items-center">
+                                <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+                                泛綠觀點
+                            </h3>
+                            <ul className="space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>• 自由時報 (Liberty Times)</li>
+                                <li>• 三立新聞 (SETN)</li>
+                                <li>• 新頭殼 (Newtalk)</li>
+                            </ul>
+                        </div>
+                        {/* Center */}
+                        <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <h3 className="text-lg font-bold text-gray-600 dark:text-gray-400 mb-4 flex items-center">
+                                <span className="w-3 h-3 bg-gray-400 rounded-full mr-2"></span>
+                                中立/其他
+                            </h3>
+                            <ul className="space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>• 中央社 (CNA)</li>
+                                <li>• 公視新聞 (PTS News)</li>
+                                <li>• 關鍵評論網 (The News Lens)</li>
+                            </ul>
+                        </div>
+                        {/* Pan-Blue */}
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg border border-blue-100 dark:border-blue-800">
+                            <h3 className="text-lg font-bold text-blue-700 dark:text-blue-400 mb-4 flex items-center">
+                                <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
+                                泛藍觀點
+                            </h3>
+                            <ul className="space-y-2 text-gray-700 dark:text-gray-300">
+                                <li>• 聯合報 (UDN)</li>
+                                <li>• TVBS 新聞</li>
+                                <li>• ETtoday 新聞雲</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                         * 我們使用即時 RSS 訊號來源，致力於涵蓋台灣主流媒體的光譜分佈。
+                    </p>
+                </section>
                 {/* The Spectrum */}
                 <section className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-8">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
                         <span className="w-1 h-8 bg-blue-600 rounded mr-3"></span>
                         台灣政治光譜分類
                     </h2>
-
                     <div className="space-y-6">
                         <div className="border-l-4 border-pan-green-500 pl-4 py-2 bg-pan-green-50 dark:bg-pan-green-900/10 rounded-r-lg">
                             <h3 className="text-xl font-bold text-pan-green-600 dark:text-pan-green-400 mb-2">
@@ -47,7 +87,6 @@ export default function MethodologyPage() {
                                 此類別的媒體在報導政治議題時，傾向支持台灣本土化意識、台灣主體性，立場通常與民主進步黨 (DPP) 或其他泛綠陣營政黨較為接近。在兩岸關係上，傾向強調台灣主權獨立與與區隔。
                             </p>
                         </div>
-
                         <div className="border-l-4 border-gray-500 pl-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-r-lg">
                             <h3 className="text-xl font-bold text-gray-700 dark:text-gray-300 mb-2">
                                 中立 (Center)
@@ -56,7 +95,6 @@ export default function MethodologyPage() {
                                 此類別的媒體致力於平衡報導，盡量減少立場鮮明的評論或特定政治傾向的用語。雖然完全的中立難以達成，但這些媒體通常會給予不同陣營較為均等的篇幅與話語權。公視與中央社通常歸於此類。
                             </p>
                         </div>
-
                         <div className="border-l-4 border-pan-blue-500 pl-4 py-2 bg-pan-blue-50 dark:bg-pan-blue-900/10 rounded-r-lg">
                             <h3 className="text-xl font-bold text-pan-blue-600 dark:text-pan-blue-400 mb-2">
                                 泛藍 (Pan-Blue)
@@ -67,14 +105,12 @@ export default function MethodologyPage() {
                         </div>
                     </div>
                 </section>
-
                 {/* Evaluation Criteria */}
                 <section className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-8">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
                         <span className="w-1 h-8 bg-blue-600 rounded mr-3"></span>
                         評估指標
                     </h2>
-
                     <div className="grid md:grid-cols-2 gap-8">
                         <div>
                             <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-3">
@@ -84,7 +120,6 @@ export default function MethodologyPage() {
                                 分析新聞標題與內文中是否使用帶有強烈情感或價值判斷的形容詞。例如稱呼特定政治人物時的敬稱或貶稱，以及對政策的描述方式。
                             </p>
                         </div>
-
                         <div>
                             <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-3">
                                 2. 消息來源 (Sourcing)
@@ -93,7 +128,6 @@ export default function MethodologyPage() {
                                 檢視報導是否過度依賴單一陣營的匿名消息來源，或是引用專家學者的比例是否平衡。
                             </p>
                         </div>
-
                         <div>
                             <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-3">
                                 3. 版面配置 (Framing)
@@ -102,7 +136,6 @@ export default function MethodologyPage() {
                                 觀察媒體將哪些新聞置於頭版或顯著位置，以及對特定議題的報導頻率與持續時間。
                             </p>
                         </div>
-
                         <div>
                             <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-3">
                                 4. 社論立場 (Editorial Stance)
@@ -113,14 +146,12 @@ export default function MethodologyPage() {
                         </div>
                     </div>
                 </section>
-
                 {/* Disclaimer */}
                 <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-6 text-center text-sm text-gray-500 dark:text-gray-400">
                     <p>
                         註：媒體偏見並非絕對的好壞標準，有立場的媒體也能產出高品質的報導。本方法的目的在於提升媒體識讀能力，而非審查媒體。
                     </p>
                 </div>
-
                 {/* Back Button */}
                 <div className="mt-12 text-center">
                     <button
