@@ -1,204 +1,169 @@
 'use client';
-import { useEffect, useState, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/Header';
-import NewsTopicCard from '@/components/NewsTopicCard';
-import { NewsTopic, NewsCategory } from '@/lib/types';
-import { getAllTopics, getTopicsByCategory } from '@/lib/mockData';
-import { fetchNewsTopics, fetchTopicsByCategory as fetchFirebaseByCategory } from '@/lib/firebaseService';
+import SourceCard from '@/components/SourceCard';
+import { NewsTopic, NewsSource, PoliticalBias } from '@/lib/types';
+import { getTopicById } from '@/lib/mockData';
+import { formatTimestamp } from '@/lib/utils';
+import { fetchTopicById as fetchFirebaseTopic } from '@/lib/firebaseService';
 // Check if Firebase is configured
-const isFirebaseConfigured = typeof window !== 'undefined' &&
-  !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
+const isFirebaseConfigured = typeof window !== 'undefined' && 
+  !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY && 
   process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'replace_this_with_your_api_key';
-function HomePageContent() {
-  const searchParams = useSearchParams();
-  const [topics, setTopics] = useState<NewsTopic[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<'recency' | 'sources'>('recency');
-  const [selectedCategory, setSelectedCategory] = useState<NewsCategory>('全部');
-  const [usingRealData, setUsingRealData] = useState(false);
-  const categories: NewsCategory[] = ['全部', '政治', '經濟', '社會', '國際', '科技', '其他'];
-  // Get category from URL or use selected
-  const categoryFromUrl = (searchParams.get('category') as NewsCategory) || '全部';
-  const category = categoryFromUrl;
-  useEffect(() => {
-    setSelectedCategory(category);
-  }, [category]);
-  useEffect(() => {
-    // Data fetching logic
-    setLoading(true);
-    const loadData = async () => {
-      try {
-        if (isFirebaseConfigured) {
-          // Try fetching from Firebase
-          const realTopics = selectedCategory === '全部'
-            ? await fetchNewsTopics()
-            : await fetchFirebaseByCategory(selectedCategory);
-          if (realTopics.length > 0) {
-            setTopics(realTopics);
-            setUsingRealData(true);
-            setLoading(false);
-            return;
-          }
-        }
-        // Fallback to mock data if Firebase not set up or empty
-        console.log('Using mock data (Firebase not configured or empty)');
-        // Simulate delay for mock data
-        await new Promise(resolve => setTimeout(resolve, 300));
-        const mockTopics = selectedCategory === '全部'
-          ? getAllTopics()
-          : getTopicsByCategory(selectedCategory);
-        setTopics(mockTopics);
-        setUsingRealData(false);
-        setLoading(false);
-      } catch (error) {
-        console.error("Failed to load data:", error);
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, [selectedCategory]);
-  // Sort topics based on selection
-  const sortedTopics = [...topics].sort((a, b) => {
-    if (sortBy === 'recency') {
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    } else {
-      return b.sourceCount - a.sourceCount;
+export default function TopicDetailPage() {
+    const params = useParams();
+    const router = useRouter();
+    const [topic, setTopic] = useState<NewsTopic | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'all' | PoliticalBias>('all');
+    useEffect(() => {
+        const topicId = params.id as string;
+        const fetchData = async () => {
+            if (isFirebaseConfigured) {
+                const firebaseTopic = await fetchFirebaseTopic(topicId);
+                if (firebaseTopic) {
+                    setTopic(firebaseTopic);
+                    setLoading(false);
+                    return;
+                }
+            }
+            
+            // Fallback to mock
+            setTimeout(() => {
+                const fetchedTopic = getTopicById(topicId);
+                setTopic(fetchedTopic);
+                setLoading(false);
+            }, 300);
+        };
+        fetchData();
+    }, [params.id]);
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+                <Header />
+                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="animate-pulse space-y-4">
+                        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                        <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </div>
+                </main>
+            </div>
+        );
     }
-  });
-  const handleCategoryChange = (cat: NewsCategory) => {
-    setSelectedCategory(cat);
-  };
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Hero Section */}
-        <div className="mb-8 text-center">
-          <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-            多元觀點 · 全面理解
-          </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            從泛綠、中立、泛藍三種角度，全方位了解台灣新聞事件。
-            基於 Media Bias Fact Check 方法論，提供客觀的新聞來源分析。
-          </p>
+    if (!topic) {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+                <Header />
+                <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">找不到該主題</h1>
+                    <button 
+                        onClick={() => router.push('/')}
+                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                        返回首頁
+                    </button>
+                </main>
+            </div>
+        );
+    }
+    // Filter sources based on active tab
+    const filteredSources = activeTab === 'all'
+        ? topic.sources
+        : topic.sources.filter(s => s.bias === activeTab);
+    const total = topic.sourceCount;
+    const { panGreen, center, panBlue } = topic.biasDistribution;
+    return (
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+            <Header />
+            
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {/* Breadcrumb */}
+                <nav className="flex mb-8 text-sm text-gray-500 dark:text-gray-400">
+                    <button onClick={() => router.push('/')} className="hover:text-blue-600">首頁</button>
+                    <span className="mx-2">/</span>
+                    <span className="text-gray-900 dark:text-gray-300 font-medium">{topic.category}</span>
+                </nav>
+                {/* Topic Header */}
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                        {topic.title}
+                    </h1>
+                    <p className="text-xl text-gray-600 dark:text-gray-300 mb-4">
+                        {topic.description}
+                    </p>
+                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                        <span>最後更新：{formatTimestamp(topic.updatedAt)}</span>
+                        <span className="mx-2">•</span>
+                        <span>{total} 則報導</span>
+                    </div>
+                </div>
+                {/* Bias Distribution Bar */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">媒體觀點分布</h2>
+                    
+                    {/* Progress Bar */}
+                    <div className="h-4 flex rounded-full overflow-hidden mb-2">
+                        <div style={{ width: `${(panGreen / total) * 100}%` }} className="bg-pan-green-500 transition-all duration-500" />
+                        <div style={{ width: `${(center / total) * 100}%` }} className="bg-gray-400 transition-all duration-500" />
+                        <div style={{ width: `${(panBlue / total) * 100}%` }} className="bg-pan-blue-500 transition-all duration-500" />
+                    </div>
+                    
+                    {/* Legend */}
+                    <div className="flex justify-between text-sm mt-2">
+                        <div className="flex items-center">
+                            <div className="w-3 h-3 bg-pan-green-500 rounded-full mr-2" />
+                            <span className="text-gray-700 dark:text-gray-300">泛綠 ({panGreen})</span>
+                        </div>
+                        <div className="flex items-center">
+                            <div className="w-3 h-3 bg-gray-400 rounded-full mr-2" />
+                            <span className="text-gray-700 dark:text-gray-300">中立 ({center})</span>
+                        </div>
+                        <div className="flex items-center">
+                            <div className="w-3 h-3 bg-pan-blue-500 rounded-full mr-2" />
+                            <span className="text-gray-700 dark:text-gray-300">泛藍 ({panBlue})</span>
+                        </div>
+                    </div>
+                </div>
+                {/* Filter Tabs */}
+                <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+                    <nav className="-mb-px flex space-x-8">
+                        {(['all', 'pan-green', 'center', 'pan-blue'] as const).map((bias) => (
+                            <button
+                                key={bias}
+                                onClick={() => setActiveTab(bias)}
+                                className={`
+                                    whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition-colors
+                                    ${activeTab === bias
+                                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'}
+                                `}
+                            >
+                                {bias === 'all' ? '全部報導' : 
+                                 bias === 'pan-green' ? '泛綠觀點' :
+                                 bias === 'center' ? '中立觀點' : '泛藍觀點'}
+                                <span className="ml-2 py-0.5 px-2.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                    {bias === 'all' ? total : 
+                                     bias === 'pan-green' ? panGreen :
+                                     bias === 'center' ? center : panBlue}
+                                </span>
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+                {/* Sources List */}
+                <div className="grid gap-6 md:grid-cols-2">
+                    {filteredSources.map((source) => (
+                        <SourceCard key={source.id} source={source} />
+                    ))}
+                    {filteredSources.length === 0 && (
+                        <div className="col-span-2 text-center py-12 text-gray-500 dark:text-gray-400">
+                            此觀點尚無相關報導
+                        </div>
+                    )}
+                </div>
+            </main>
         </div>
-        {/* Category Filter Tabs */}
-        <div className="mb-6 overflow-x-auto">
-          <div className="flex items-center space-x-2 min-w-max pb-2">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => handleCategoryChange(cat)}
-                className={`
-                  px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap
-                  ${selectedCategory === cat
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
-                  }
-                `}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-        {/* Filter and Sort Bar */}
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {selectedCategory === '全部' ? '所有類別' : selectedCategory}
-            </span>
-            <span className="text-sm text-gray-400 dark:text-gray-500">·</span>
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              {topics.length} 個新聞主題
-            </span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">排序:</span>
-            <button
-              onClick={() => setSortBy('recency')}
-              className={`px-3 py-1 rounded-md text-sm transition-colors ${sortBy === 'recency'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-            >
-              最新
-            </button>
-            <button
-              onClick={() => setSortBy('sources')}
-              className={`px-3 py-1 rounded-md text-sm transition-colors ${sortBy === 'sources'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                }`}
-            >
-              最多來源
-            </button>
-          </div>
-        </div>
-        {/* Loading State */}
-        {loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 dark:bg-gray-700 rounded-lg h-80"></div>
-              </div>
-            ))}
-          </div>
-        )}
-        {/* Topics Grid */}
-        {!loading && sortedTopics.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-            {sortedTopics.map((topic) => (
-              <NewsTopicCard key={topic.id} topic={topic} />
-            ))}
-          </div>
-        )}
-        {/* Empty State */}
-        {!loading && sortedTopics.length === 0 && (
-          <div className="text-center py-16">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
-              目前沒有新聞
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              此分類暫無新聞主題
-            </p>
-          </div>
-        )}
-        {/* Footer Info */}
-        <div className="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700 text-center text-sm text-gray-500 dark:text-gray-400">
-          <p className="mb-2">
-            本平台旨在提供多元新聞觀點，幫助讀者全面了解台灣時事
-          </p>
-          <p>
-            來源評級基於 Media Bias Fact Check 方法論 ·
-            分類依據：泛綠 (Pan-Green) · 中立 (Center) · 泛藍 (Pan-Blue)
-          </p>
-        </div>
-      </main>
-    </div>
-  );
-}
-export default function HomePage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <Header />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="animate-pulse">
-                <div className="bg-gray-200 dark:bg-gray-700 rounded-lg h-80"></div>
-              </div>
-            ))}
-          </div>
-        </main>
-      </div>
-    }>
-      <HomePageContent />
-    </Suspense>
-  );
+    );
 }
