@@ -46,11 +46,19 @@ export function getBiasLabel(bias: PoliticalBias): string {
 // Format timestamp to Traditional Chinese format
 export function formatTimestamp(timestamp: string): string {
     const date = new Date(timestamp);
+    // Check if timestamp is valid
+    if (isNaN(date.getTime())) {
+        return '近期'; 
+    }
     const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-
-    if (diffInHours < 1) {
-        const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    const diffInMilliseconds = now.getTime() - date.getTime();
+    
+    // Convert to hours
+    const diffInHours = Math.floor(diffInMilliseconds / (1000 * 60 * 60));
+    // Handle future dates or tiny diffs
+    if (diffInHours < 1 || isNaN(diffInHours)) {
+        const diffInMinutes = Math.floor(diffInMilliseconds / (1000 * 60));
+        if (diffInMinutes < 1) return '剛剛';
         return `${diffInMinutes} 分鐘前`;
     } else if (diffInHours < 24) {
         return `${diffInHours} 小時前`;
