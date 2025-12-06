@@ -47,7 +47,66 @@ async function initFirebase() {
         console.error('❌ Firebase Init Error:', error.message);
     }
 }
-// ... (FEEDS config and fetchAndParseRSS function remain unchanged) ...
+// News Sources Configuration
+const FEEDS = [
+    // --- Pan-Green ---
+    // { id: 'ltn', name: '自由時報', bias: 'pan-green', credibility: 4, url: 'https://news.ltn.com.tw/rss/all.xml' }, // Often slow?
+    { id: 'setn', name: '三立新聞', bias: 'pan-green', credibility: 3, url: 'https://www.setn.com/rss.aspx?PageGroupID=1' },
+    { id: 'newtalk', name: '新頭殼', bias: 'pan-green', credibility: 3, url: 'https://newtalk.tw/rss/news/all' },
+    // --- Center ---
+    { id: 'cna', name: '中央社', bias: 'center', credibility: 5, url: 'https://feeds.feedburner.com/cnaFirstNews' },
+    { id: 'pts', name: '公視新聞', bias: 'center', credibility: 5, url: 'https://news.pts.org.tw/xml/newsfeed.xml' },
+    { id: 'tnl', name: '關鍵評論網', bias: 'center', credibility: 4, url: 'https://feeds.feedburner.com/TheNewsLens' },
+    // --- Pan-Blue ---
+    { id: 'udn', name: '聯合報', bias: 'pan-blue', credibility: 4, url: 'https://udn.com/rssfeed/news/2/7227?ch=news' },
+    { id: 'tvbs', name: 'TVBS', bias: 'pan-blue', credibility: 4, url: 'https://news.tvbs.com.tw/rss/news.xml' },
+    { id: 'ettoday', name: 'ETtoday', bias: 'pan-blue', credibility: 3, url: 'https://feeds.feedburner.com/ettoday/realtime' }
+];
+async function fetchAndParseRSS(feed) {
+    try {
+        // console.log(`📡 Fetching ${feed.name}...`);
+        const response = await axios.get(feed.url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml',
+            },
+            timeout: 10000
+        });
+        const parser = new xml2js.Parser({ explicitArray: false });
+        const cleanXml = response.data.replace(/&(?!(?:apos|quot|[gl]t|amp);|#)/g, '&amp;');
+        const result = await parser.parseStringPromise(cleanXml);
+        const items = result.rss?.channel?.item || result.feed?.entry || [];
+        const itemsArray = Array.isArray(items) ? items : [items];
+        return itemsArray.slice(0, 30).map(item => ({
+            name: feed.name,
+            bias: feed.bias,
+            credibility: feed.credibility,
+            headline: item.title,
+            url: item.link,
+            summary: item.description ? item.description.replace(/<[^>]*>/g, '').substring(0, 200) + '...' : '',
+            publishedAt: new Date(item.pubDate || item.published || new Date()).toISOString(),
+            sourceId: feed.id
+        }));
+    } catch (error) {
+        // console.error(`Error fetching ${feed.name}:`, error.message);
+        return [];
+    }
+}
+// Tokenize title for comparison (Bigrams)
+const getTokens = (str) => {
+    const clean = str.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
+    const tokens = new Set();
+    for (let i = 0; i < clean.length - 1; i++) {
+        tokens.add(clean.substring(i, i + 2));
+    }
+    return tokens;
+};
+// Jaccard Similarity
+const calculateSimilarity = (setA, setB) => {
+    let intersection = 0;
+    setA.forEach(token => { if (setB.has(token)) intersection++; });
+    return intersection / (setA.size + setB.size - intersection);
+};
 // Group raw articles into clusters
 function clusterArticles(articles) {
     const clusters = [];
