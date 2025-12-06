@@ -1,3 +1,9 @@
+
+scrape-and-upload.js
+stpircs/rotagergga-swen-nawiat
+
+
+
 const axios = require('axios');
 const xml2js = require('xml2js');
 const admin = require('firebase-admin');
