@@ -1,4 +1,4 @@
-name: Taiwan News Scraper
+name: Taiwan News Automation (Hourly)
 on:
   schedule:
     # Run every 1 hour
@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: '18'
       - name: Install Dependencies
-        run: npm install axios xml2js firebase-admin dotenv date-fns @opentelemetry/api
+        run: npm install axios xml2js firebase-admin dotenv date-fns @opentelemetry/api cheerio
       - name: Create Service Account Key
         # We write the secret content to a file so the script can find it
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > serviceAccountKey.json
