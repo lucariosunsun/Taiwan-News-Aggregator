@@ -1,0 +1,94 @@
+{
+    "sheets": {
+        "politics": "1cEsUIyM_zUo3vdUQbjaJe5Dp4MvjJWTDw8W-CUzpSXk",
+        "economy": "1Vj6T-Kkgmr57hOHGKtBZxHu-x2o5yOwcZ99s5RlZktc",
+        "society": "19DV4UWbvSzDQs4reHdpb7A0dJZEvjhHg6hCcEwulPTY",
+        "international": "1Fd4WVU66EBfalmDTUMHp7USjw_f8hdqtWu8s9sBKnzk",
+        "technology": "1LTsAQ-qfBCLvDiZbUXSWvHld9qsxVbh7kLsbT7RwuEA",
+        "other": "16iOSc8wHg2LocGSnRCU_Nt9itYo9lA_E7OD8vpoJ5Lk",
+        "summary": "1xrhPhv9D0gnke6_wpIaUa5101GhSP2D7WGkrDAqGsGw"
+    },
+    "categoryKeywords": {
+        "politics": [
+            "立法院",
+            "總統",
+            "選舉",
+            "政黨",
+            "國會",
+            "立委",
+            "行政院",
+            "朝野",
+            "民進黨",
+            "國民黨",
+            "民眾黨",
+            "政治",
+            "政府",
+            "法案",
+            "預算"
+        ],
+        "economy": [
+            "經濟",
+            "台積電",
+            "股市",
+            "GDP",
+            "出口",
+            "貿易",
+            "投資",
+            "企業",
+            "產業",
+            "金融",
+            "央行",
+            "匯率",
+            "通膨",
+            "失業"
+        ],
+        "society": [
+            "社會",
+            "健保",
+            "教育",
+            "醫療",
+            "犯罪",
+            "交通",
+            "環保",
+            "勞工",
+            "房價",
+            "民生",
+            "食安"
+        ],
+        "international": [
+            "國際",
+            "美國",
+            "中國",
+            "日本",
+            "歐洲",
+            "外交",
+            "戰爭",
+            "烏克蘭",
+            "以色列",
+            "聯合國",
+            "北約"
+        ],
+        "technology": [
+            "科技",
+            "AI",
+            "人工智慧",
+            "晶片",
+            "半導體",
+            "5G",
+            "電動車",
+            "科學",
+            "研發",
+            "創新",
+            "網路"
+        ],
+        "other": [
+            "其他",
+            "娛樂",
+            "體育",
+            "文化",
+            "藝術",
+            "旅遊",
+            "氣象"
+        ]
+    }
+}
