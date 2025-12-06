@@ -1,9 +1,3 @@
-
-scrape-and-upload.js
-stpircs/rotagergga-swen-nawiat
-
-
-
 const axios = require('axios');
 const xml2js = require('xml2js');
 const admin = require('firebase-admin');
@@ -79,7 +73,17 @@ function clusterArticles(articles) {
             }
         }
         if (bestCluster) {
-            bestCluster.sources.push(article);
+            // ENFORCE UNIQUE SOURCE: Check if this source (e.g. TVBS) is already in the cluster
+            const existingSourceIndex = bestCluster.sources.findIndex(s => s.sourceId === article.sourceId);
+            if (existingSourceIndex !== -1) {
+                // If same source exists, keep the NEWER one
+                const existing = bestCluster.sources[existingSourceIndex];
+                if (new Date(article.publishedAt) > new Date(existing.publishedAt)) {
+                    bestCluster.sources[existingSourceIndex] = article;
+                }
+            } else {
+                bestCluster.sources.push(article);
+            }
         } else {
             clusters.push({
                 title: article.headline,
