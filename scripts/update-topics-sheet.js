@@ -45,12 +45,29 @@ const WEBSITE_TOPICS = [
     }
 ];
 async function authenticate() {
-    const serviceAccountPath = path.join(__dirname, '../serviceAccountKey.json');
-    if (!fs.existsSync(serviceAccountPath)) {
-        throw new Error('serviceAccountKey.json not found');
+    let serviceAccount;
+    const localKeyPath = path.join(__dirname, '../serviceAccountKey.json');
+    if (fs.existsSync(localKeyPath)) {
+        console.log('🔑 Using local serviceAccountKey.json');
+        serviceAccount = require(localKeyPath);
+    } else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+        console.log('🔑 Using FIREBASE_SERVICE_ACCOUNT_KEY from environment');
+        try {
+            serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+        } catch (e) {
+            try {
+                const buffer = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, 'base64');
+                serviceAccount = JSON.parse(buffer.toString('utf8'));
+            } catch (e2) {
+                console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY');
+                throw new Error('Invalid Secret Format');
+            }
+        }
+    } else {
+        throw new Error('No serviceAccountKey.json or FIREBASE_SERVICE_ACCOUNT_KEY found');
     }
     const auth = new google.auth.GoogleAuth({
-        keyFile: serviceAccountPath,
+        credentials: serviceAccount,
         scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
     return auth;
