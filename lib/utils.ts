@@ -1,12 +1,10 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { PoliticalBias, BiasDistribution } from './types';
-
 // Merge Tailwind classes
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
-
 // Get color class for bias type
 export function getBiasColor(bias: PoliticalBias): string {
     switch (bias) {
@@ -18,7 +16,6 @@ export function getBiasColor(bias: PoliticalBias): string {
             return 'bg-blue-500';
     }
 }
-
 // Get text color for bias type
 export function getBiasTextColor(bias: PoliticalBias): string {
     switch (bias) {
@@ -30,7 +27,6 @@ export function getBiasTextColor(bias: PoliticalBias): string {
             return 'text-blue-600';
     }
 }
-
 // Get bias label in Traditional Chinese
 export function getBiasLabel(bias: PoliticalBias): string {
     switch (bias) {
@@ -42,17 +38,15 @@ export function getBiasLabel(bias: PoliticalBias): string {
             return '泛藍';
     }
 }
-
 // Format timestamp to Traditional Chinese format
 export function formatTimestamp(timestamp: string): string {
     const date = new Date(timestamp);
     // Check if timestamp is valid
     if (isNaN(date.getTime())) {
-        return '近期'; 
+        return '近期'; // Fallback if invalid
     }
     const now = new Date();
     const diffInMilliseconds = now.getTime() - date.getTime();
-    
     // Convert to hours
     const diffInHours = Math.floor(diffInMilliseconds / (1000 * 60 * 60));
     // Handle future dates or tiny diffs
@@ -71,7 +65,6 @@ export function formatTimestamp(timestamp: string): string {
         return `${year}年${month}月${day}日`;
     }
 }
-
 // Calculate bias distribution from sources
 export function calculateBiasDistribution(sources: { bias: PoliticalBias }[]): BiasDistribution {
     const distribution = {
@@ -79,27 +72,33 @@ export function calculateBiasDistribution(sources: { bias: PoliticalBias }[]): B
         center: 0,
         panBlue: 0,
     };
-
     sources.forEach((source) => {
         if (source.bias === 'pan-green') distribution.panGreen++;
         else if (source.bias === 'center') distribution.center++;
         else if (source.bias === 'pan-blue') distribution.panBlue++;
     });
-
     return distribution;
 }
-
 // Get credibility stars
 export function getCredibilityStars(rating: number): string {
     return '★'.repeat(rating) + '☆'.repeat(5 - rating);
 }
-
 // Sort topics by recency
 export function sortByRecency<T extends { updatedAt: string }>(items: T[]): T[] {
     return [...items].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
-
 // Sort topics by source count
 export function sortBySourceCount<T extends { sourceCount: number }>(items: T[]): T[] {
     return [...items].sort((a, b) => b.sourceCount - a.sourceCount);
+}
+// Deduplicate sources based on URL
+export function deduplicateSources<T extends { url: string }>(sources: T[]): T[] {
+    const seen = new Set<string>();
+    return sources.filter(source => {
+        if (seen.has(source.url)) {
+            return false;
+        }
+        seen.add(source.url);
+        return true;
+    });
 }
