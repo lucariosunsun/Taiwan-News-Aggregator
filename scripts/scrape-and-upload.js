@@ -131,18 +131,41 @@ async function syncToFirestore(newClusters) {
         if (match) {
             // MERGE: Add new sources to existing topic
             // console.log(`   🔗 Merging into "${match.title}" (Sim: ${maxSim.toFixed(2)})`);
-            // Fetch existing sources to check duplicates
+            // Fetch existing sources (Map by sourceId to prevent publisher duplicates)
             const sourcesRef = db.collection('topics').doc(match.id).collection('sources');
             const sourceSnaps = await sourcesRef.get();
-            const existingUrls = new Set();
-            sourceSnaps.forEach(doc => existingUrls.add(doc.data().url));
+            const existingPublishers = new Map();
+            sourceSnaps.forEach(doc => {
+                const data = doc.data();
+                // Ensure we have a date object
+                const pDate = data.publishedAt && data.publishedAt.toDate ? data.publishedAt.toDate() : new Date(data.publishedAt || 0);
+                existingPublishers.set(data.sourceId, {
+                    docId: doc.id,
+                    publishedAt: pDate,
+                    url: data.url
+                });
+            });
             let addedSources = 0;
-            const batch = db.batch(); // Batch writes for atomicity
+            let updatedSources = 0;
+            const batch = db.batch();
             for (const source of cluster.sources) {
-                if (!existingUrls.has(source.url)) {
+                // Skip if no sourceId (shouldn't happen given our config)
+                if (!source.sourceId) continue;
+                const existing = existingPublishers.get(source.sourceId);
+                const newDate = new Date(source.publishedAt);
+                if (existing) {
+                    // Update ONLY if newer
+                    if (newDate > existing.publishedAt && source.url !== existing.url) {
+                        const docRef = sourcesRef.doc(existing.docId);
+                        batch.set(docRef, { ...source, publishedAt: newDate });
+                        existingPublishers.set(source.sourceId, { ...existing, publishedAt: newDate }); // Update map
+                        updatedSources++;
+                    }
+                } else {
+                    // New Publisher -> Create
                     const newSourceRef = sourcesRef.doc();
-                    batch.set(newSourceRef, { ...source, publishedAt: new Date(source.publishedAt) });
-                    existingUrls.add(source.url); // Prevent adding twice in same loop
+                    batch.set(newSourceRef, { ...source, publishedAt: newDate });
+                    existingPublishers.set(source.sourceId, { docId: newSourceRef.id, publishedAt: newDate });
                     addedSources++;
                 }
             }
