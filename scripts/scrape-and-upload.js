@@ -1,183 +1,246 @@
-/* scripts/scrape-and-upload.js */
 const axios = require('axios');
 const xml2js = require('xml2js');
 const admin = require('firebase-admin');
 const path = require('path');
-// --- 1. CONFIGURATION & SETUP ---
-try {
-  // Try local credentials first
-  const serviceAccount = require(path.join(__dirname, '../serviceAccountKey.json'));
-  if (admin.apps.length === 0) {
-      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-  }
-} catch (error) {
-  // Fallback to GitHub Secret
-  if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length === 0) {
-      admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
-  }
-}
-const db = admin.apps.length > 0 ? admin.firestore() : null;
-// The "Real-Time / Hot" Feed List
-const FEEDS = [
-  { id: 'ltn', name: '自由時報', nameEn: 'Liberty Times', bias: 'pan-green', credibility: 4, url: 'https://news.ltn.com.tw/rss/all.xml' },
-  { id: 'setn', name: '三立新聞', nameEn: 'SETN', bias: 'pan-green', credibility: 3, url: 'https://www.setn.com/rss.aspx?PageGroupID=1' }, // Breaking
-  { id: 'newtalk', name: '新頭殼', nameEn: 'Newtalk', bias: 'pan-green', credibility: 3, url: 'https://newtalk.tw/rss/news/all' },
-  { id: 'cna', name: '中央社', nameEn: 'CNA', bias: 'center', credibility: 5, url: 'https://feeds.feedburner.com/cnaFirstNews' },
-  { id: 'pts', name: '公視新聞', nameEn: 'PTS News', bias: 'center', credibility: 5, url: 'https://news.pts.org.tw/xml/newsfeed.xml' },
-  { id: 'tnl', name: '關鍵評論網', nameEn: 'The News Lens', bias: 'center', credibility: 4, url: 'https://feeds.feedburner.com/TheNewsLens' }, // Latest
-  { id: 'udn', name: '聯合報', nameEn: 'United Daily News', bias: 'pan-blue', credibility: 4, url: 'https://udn.com/rssfeed/news/2/7227?ch=news' }, // Realtime
-  { id: 'tvbs', name: 'TVBS', nameEn: 'TVBS News', bias: 'pan-blue', credibility: 4, url: 'https://news.tvbs.com.tw/rss/news.xml' }, // Focus
-  { id: 'ettoday', name: 'ETtoday', nameEn: 'ETtoday', bias: 'pan-blue', credibility: 3, url: 'https://feeds.feedburner.com/ettoday/realtime' }
-];
-// --- 2. INTELLIGENT HELPERS ---
-// A. Keyword Detector (Your "Library" for sorting)
-function detectCategory(text) {
-    const t = text.toLowerCase();
-    if (t.match(/台積電|輝達|ai|蘋果|iphone|半導體|晶片|科技|特斯拉|伺服器/)) return '科技';
-    if (t.match(/股市|台股|美股|匯率|央行|房價|房市|營收|經濟|gdp|通膨|理財/)) return '經濟';
-    if (t.match(/美國|川普|拜登|中國|日本|烏克蘭|以色列|以哈|習近平|普丁|國際|南韓/)) return '國際';
-    if (t.match(/車禍|命案|氣象|颱風|地震|放假|停班|交通|捷運|公車|社會|食安/)) return '社會';
-    if (t.match(/賴清德|柯文哲|侯友宜|國民黨|民進黨|民眾黨|立法院|韓國瑜|內閣|行政院|總統|大選|罷免|政治/)) return '政治';
-    return '其他'; // Check your "Others" tab frequently to see what it misses!
-}
-// B. Smart Similarity (Jaccard Index)
-function calculateSimilarity(str1, str2) {
-    const tokenize = (s) => {
-        const clean = s.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
-        const tokens = new Set();
-        for (let i = 0; i < clean.length - 1; i++) tokens.add(clean.substring(i, i + 2));
-        return tokens;
-    };
-    const setA = tokenize(str1);
-    const setB = tokenize(str2);
-    let intersection = 0;
-    setA.forEach(t => { if(setB.has(t)) intersection++; });
-    return intersection / (setA.size + setB.size - intersection);
-}
-// --- 3. MAIN LOGIC ---
-async function fetchAndParseRSS(feed) {
-  try {
-    const response = await axios.get(feed.url, { timeout: 10000 });
-    const parser = new xml2js.Parser({ explicitArray: false });
-    const cleanXml = response.data.replace(/&(?!(?:apos|quot|[gl]t|amp);|#)/g, '&amp;'); 
-    const result = await parser.parseStringPromise(cleanXml);
-    
-    let items = result.rss?.channel?.item || result.feed?.entry || [];
-    if (!Array.isArray(items)) items = [items];
-    
-    // NO SLICE/LIMIT - Get everything
-    return items.map(item => {
-      const headline = item.title || '';
-      return { 
-        name: feed.name,
-        nameEn: feed.nameEn,
-        bias: feed.bias,
-        headline: headline,
-        url: item.link && typeof item.link === 'string' ? item.link : (item.link?.href || ''),
-        summary: item.description ? item.description.replace(/<[^>]*>/g, '').substring(0, 200) + '...' : '',
-        publishedAt: new Date(item.pubDate || item.published || new Date()).toISOString(),
-        sourceId: feed.id,
-        categoryTag: detectCategory(headline) // <--- APPLY CATEGORY HERE
-      };
-    }).filter(i => i.url && i.headline);
-  } catch (error) {
-    return [];
-  }
-}
-async function getExistingUrls() {
-    if (!db) return new Set();
-    const existingUrls = new Set();
+const fs = require('fs');
+/**
+ * ⚠️ CONFIGURATION & SETUP
+ * Local: Place serviceAccountKey.json in root.
+ * GitHub Actions: Set FIREBASE_SERVICE_ACCOUNT_KEY secret (Base64 encoded json).
+ */
+// Initialize Firebase Admin
+let db = null;
+async function initFirebase() {
     try {
-        // Optimized check: Look at last 300 topics
-        const snapshot = await db.collection('topics').orderBy('updatedAt', 'desc').limit(300).get();
-        const promises = snapshot.docs.map(doc => doc.ref.collection('sources').get());
-        const results = await Promise.all(promises);
-        results.forEach(snap => snap.forEach(doc => { if (doc.data().url) existingUrls.add(doc.data().url); }));
-    } catch (e) {}
-    return existingUrls;
+        let serviceAccount;
+        const localKeyPath = path.join(__dirname, '../serviceAccountKey.json');
+        if (fs.existsSync(localKeyPath)) {
+            console.log('🔑 Using local serviceAccountKey.json');
+            serviceAccount = require(localKeyPath);
+        } else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+            console.log('🔑 Using FIREBASE_SERVICE_ACCOUNT_KEY from environment');
+            const buffer = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_KEY, 'base64');
+            serviceAccount = JSON.parse(buffer.toString('utf8'));
+        } else {
+            console.warn('⚠️ No credentials found. Scraper will run in DRY RUN mode (no upload).');
+            return;
+        }
+        if (!admin.apps.length) {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+        }
+        db = admin.firestore();
+        console.log('✅ Firebase Database Connected');
+    } catch (error) {
+        console.error('❌ Firebase Init Error:', error.message);
+    }
 }
-function groupArticles(articles) {
+// News Sources Configuration
+const FEEDS = [
+    // --- Pan-Green ---
+    // { id: 'ltn', name: '自由時報', bias: 'pan-green', credibility: 4, url: 'https://news.ltn.com.tw/rss/all.xml' }, // Often slow?
+    { id: 'setn', name: '三立新聞', bias: 'pan-green', credibility: 3, url: 'https://www.setn.com/rss.aspx?PageGroupID=1' },
+    { id: 'newtalk', name: '新頭殼', bias: 'pan-green', credibility: 3, url: 'https://newtalk.tw/rss/news/all' },
+    // --- Center ---
+    { id: 'cna', name: '中央社', bias: 'center', credibility: 5, url: 'https://feeds.feedburner.com/cnaFirstNews' },
+    { id: 'pts', name: '公視新聞', bias: 'center', credibility: 5, url: 'https://news.pts.org.tw/xml/newsfeed.xml' },
+    { id: 'tnl', name: '關鍵評論網', bias: 'center', credibility: 4, url: 'https://feeds.feedburner.com/TheNewsLens' },
+    // --- Pan-Blue ---
+    { id: 'udn', name: '聯合報', bias: 'pan-blue', credibility: 4, url: 'https://udn.com/rssfeed/news/2/7227?ch=news' },
+    { id: 'tvbs', name: 'TVBS', bias: 'pan-blue', credibility: 4, url: 'https://news.tvbs.com.tw/rss/news.xml' },
+    { id: 'ettoday', name: 'ETtoday', bias: 'pan-blue', credibility: 3, url: 'https://feeds.feedburner.com/ettoday/realtime' }
+];
+async function fetchAndParseRSS(feed) {
+    try {
+        // console.log(`📡 Fetching ${feed.name}...`);
+        const response = await axios.get(feed.url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml',
+            },
+            timeout: 10000
+        });
+        const parser = new xml2js.Parser({ explicitArray: false });
+        const cleanXml = response.data.replace(/&(?!(?:apos|quot|[gl]t|amp);|#)/g, '&amp;');
+        const result = await parser.parseStringPromise(cleanXml);
+        const items = result.rss?.channel?.item || result.feed?.entry || [];
+        const itemsArray = Array.isArray(items) ? items : [items];
+        return itemsArray.slice(0, 30).map(item => ({
+            name: feed.name,
+            bias: feed.bias,
+            credibility: feed.credibility,
+            headline: item.title,
+            url: item.link,
+            summary: item.description ? item.description.replace(/<[^>]*>/g, '').substring(0, 200) + '...' : '',
+            publishedAt: new Date(item.pubDate || item.published || new Date()).toISOString(),
+            sourceId: feed.id
+        }));
+    } catch (error) {
+        // console.error(`Error fetching ${feed.name}:`, error.message);
+        return [];
+    }
+}
+// Tokenize title for comparison (Bigrams)
+const getTokens = (str) => {
+    const clean = str.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '');
+    const tokens = new Set();
+    for (let i = 0; i < clean.length - 1; i++) {
+        tokens.add(clean.substring(i, i + 2));
+    }
+    return tokens;
+};
+// Jaccard Similarity
+const calculateSimilarity = (setA, setB) => {
+    let intersection = 0;
+    setA.forEach(token => { if (setB.has(token)) intersection++; });
+    return intersection / (setA.size + setB.size - intersection);
+};
+// Group raw articles into clusters
+function clusterArticles(articles) {
     const clusters = [];
     const processedUrls = new Set();
-    
-    // Sort critical for finding the "Best First" article
+    // Sort by date desc so newest is "leader"
     const sorted = articles.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
     for (const article of sorted) {
         if (processedUrls.has(article.url)) continue;
+        const articleTokens = getTokens(article.headline);
         let bestCluster = null;
         let maxSim = 0;
         for (const cluster of clusters) {
-            const sim = calculateSimilarity(article.headline, cluster.sources[0].headline);
-            if (sim > 0.25 && sim > maxSim) { // 25% similarity threshold
+            const leaderTokens = getTokens(cluster.sources[0].headline);
+            const sim = calculateSimilarity(articleTokens, leaderTokens);
+            if (sim > 0.15 && sim > maxSim) { // RELAXED THRESHOLD: 0.15
                 maxSim = sim;
                 bestCluster = cluster;
             }
         }
         if (bestCluster) {
             bestCluster.sources.push(article);
-            // Bias Update
-            if (article.bias === 'pan-green') bestCluster.biasDistribution.panGreen++;
-            else if (article.bias === 'center') bestCluster.biasDistribution.center++;
-            else if (article.bias === 'pan-blue') bestCluster.biasDistribution.panBlue++;
-            
-            // Category Update: If we found a better category than "Other", switch to it
-            if (bestCluster.category === '其他' && article.categoryTag !== '其他') {
-                bestCluster.category = article.categoryTag;
-            }
         } else {
             clusters.push({
                 title: article.headline,
                 description: article.summary,
-                category: article.categoryTag,
-                updatedAt: article.publishedAt,
-                sources: [article],
-                biasDistribution: {
-                    panGreen: article.bias === 'pan-green' ? 1 : 0,
-                    center: article.bias === 'center' ? 1 : 0,
-                    panBlue: article.bias === 'pan-blue' ? 1 : 0
-                }
+                category: '政治', // Default
+                updatedAt: article.publishedAt, // Will track latest update
+                sources: [article]
             });
         }
         processedUrls.add(article.url);
     }
-    
-    return clusters.map(c => ({...c, sourceCount: c.sources.length})).sort((a,b) => b.sourceCount - a.sourceCount);
+    return clusters; // REMOVED FILTER: Return all clusters
+}
+async function syncToFirestore(newClusters) {
+    if (!db) return;
+    console.log('🔄 Syncing to Firestore...');
+    // 1. Fetch recent active topics from Firestore (last 48 hours)
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const snapshot = await db.collection('topics')
+        .where('updatedAt', '>', twoDaysAgo) // Only check recent topics
+        .get();
+    const existingTopics = [];
+    snapshot.forEach(doc => existingTopics.push({ id: doc.id, ...doc.data() }));
+    console.log(`📂 Loaded ${existingTopics.length} recent existing topics to check against.`);
+    let createdCount = 0;
+    let mergedCount = 0;
+    let ignoredCount = 0;
+    for (const cluster of newClusters) {
+        // Check if this cluster matches an existing topic
+        const clusterTokens = getTokens(cluster.title);
+        let match = null;
+        let maxSim = 0;
+        for (const topic of existingTopics) {
+            const topicTokens = getTokens(topic.title);
+            const sim = calculateSimilarity(clusterTokens, topicTokens);
+            if (sim > 0.35 && sim > maxSim) {
+                maxSim = sim;
+                match = topic;
+            }
+        }
+        if (match) {
+            // MERGE: Add new sources to existing topic
+            // console.log(`   🔗 Merging into "${match.title}" (Sim: ${maxSim.toFixed(2)})`);
+            // Fetch existing sources to check duplicates
+            const sourcesRef = db.collection('topics').doc(match.id).collection('sources');
+            const sourceSnaps = await sourcesRef.get();
+            const existingUrls = new Set();
+            sourceSnaps.forEach(doc => existingUrls.add(doc.data().url));
+            let addedSources = 0;
+            const batch = db.batch(); // Batch writes for atomicity
+            for (const source of cluster.sources) {
+                if (!existingUrls.has(source.url)) {
+                    const newSourceRef = sourcesRef.doc();
+                    batch.set(newSourceRef, { ...source, publishedAt: new Date(source.publishedAt) });
+                    existingUrls.add(source.url); // Prevent adding twice in same loop
+                    addedSources++;
+                }
+            }
+            if (addedSources > 0) {
+                const topicRef = db.collection('topics').doc(match.id);
+                batch.update(topicRef, {
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    sourceCount: admin.firestore.FieldValue.increment(addedSources)
+                });
+                await batch.commit();
+                mergedCount++;
+            } else {
+                ignoredCount++;
+            }
+        } else {
+            // CREATE: New Topic
+            const topicRef = db.collection('topics').doc();
+            const { sources, ...topicData } = cluster;
+            const biasDist = { panGreen: 0, center: 0, panBlue: 0 };
+            sources.forEach(s => {
+                if (s.bias === 'pan-green') biasDist.panGreen++;
+                else if (s.bias === 'center') biasDist.center++;
+                else if (s.bias === 'pan-blue') biasDist.panBlue++;
+            });
+            const batch = db.batch();
+            // Set Topic
+            batch.set(topicRef, {
+                ...topicData,
+                biasDistribution: biasDist,
+                sourceCount: sources.length,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            // Set Sources
+            sources.forEach(source => {
+                const sRef = topicRef.collection('sources').doc();
+                batch.set(sRef, { ...source, publishedAt: new Date(source.publishedAt) });
+            });
+            await batch.commit();
+            createdCount++;
+        }
+    }
+    console.log('\n📊 Sync Summary:');
+    console.log(`   ✨ Created: ${createdCount} new topics`);
+    console.log(`   🔗 Merged:  ${mergedCount} into existing topics`);
+    console.log(`   ⏭️  No New Sources: ${ignoredCount} topics`);
 }
 async function main() {
-  console.log('🚀 Starting NO-LIMIT Smart Scraper...');
-  const existingUrls = await getExistingUrls();
-  let allArticles = [];
-  for (const feed of FEEDS) {
-    const articles = await fetchAndParseRSS(feed);
-    allArticles = [...allArticles, ...articles];
-  }
-  
-  const newArticles = allArticles.filter(a => !existingUrls.has(a.url));
-  console.log(`📊 Found ${newArticles.length} NEW articles (out of ${allArticles.length} total).`);
-  if (newArticles.length === 0) return;
-  const topics = groupArticles(newArticles);
-  console.log(`✨ Generated ${topics.length} topics. Uploading...`);
-  if (!db) return;
-  for (const topic of topics) {
-    try {
-      const topicRef = db.collection('topics').doc();
-      const { sources, ...topicData } = topic;
-      
-      await topicRef.set({
-        ...topicData,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      for (const source of sources) {
-        await topicRef.collection('sources').add({
-          ...source,
-          publishedAt: new Date(source.publishedAt)
-        });
-      }
-      console.log(`✅ [${topic.category}] ${topic.title}`);
-    } catch (e) {
-      console.error('Upload error:', e);
+    console.log('🚀 Starting Automated News Scraper & Sync...');
+    await initFirebase();
+    // 1. Fetch
+    let allArticles = [];
+    console.log('📡 Fetching RSS feeds...');
+    const fetchPromises = FEEDS.map(feed => fetchAndParseRSS(feed));
+    const results = await Promise.all(fetchPromises);
+    results.forEach(res => allArticles.push(...res));
+    console.log(`   -> Collected ${allArticles.length} articles.`);
+    // 2. Cluster
+    console.log('🧠 Clustering articles...');
+    const clusters = clusterArticles(allArticles);
+    console.log(`   -> Formed ${clusters.length} clusters.`);
+    // 3. Sync
+    if (db) {
+        await syncToFirestore(clusters);
+    } else {
+        console.log('🚫 DRY RUN: Skipping Firestore sync.');
+        // console.log(JSON.stringify(clusters.slice(0,2), null, 2));
     }
-  }
-  console.log('🎉 Done!');
+    console.log('✅ Done.');
+    process.exit(0);
 }
 main();
