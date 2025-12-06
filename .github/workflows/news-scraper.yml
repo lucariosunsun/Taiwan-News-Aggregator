@@ -1,0 +1,36 @@
+name: Taiwan News Scraper
+on:
+  schedule:
+    # Run every 1 hour
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allows manual trigger
+  push:
+    branches:
+      - main
+      - master
+jobs:
+  scrape-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install Dependencies
+        run: npm install axios xml2js firebase-admin dotenv date-fns @opentelemetry/api
+      - name: Create Service Account Key
+        # We write the secret content to a file so the script can find it
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > serviceAccountKey.json
+      - name: Run Scraper (Firebase Upload)
+        run: node scripts/scrape-and-upload.js
+        continue-on-error: true # Allow proceeding even if Firebase upload fails
+      - name: Run Targeted Search Scraper
+        run: node scripts/search-related-news.js
+      - name: Upload Search Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: related-news-csv
+          path: scraped-news-related/*.csv
+          retention-days: 5
