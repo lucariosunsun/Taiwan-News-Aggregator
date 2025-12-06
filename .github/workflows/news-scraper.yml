@@ -9,7 +9,8 @@ on:
       - main
       - master
 jobs:
-  scrape-and-update:
+  news-automation-bot:
+    name: 🤖 Taiwan News Bot
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -19,7 +20,10 @@ jobs:
         with:
           node-version: '18'
       - name: Install Dependencies
-        run: npm install axios xml2js firebase-admin dotenv date-fns @opentelemetry/api cheerio
+        # Using 'npm install' ensures we respect package.json, which includes cheerio
+        run: npm install
+      - name: Debug - List Scripts
+        run: ls -la scripts/
       - name: Create Service Account Key
         # We write the secret content to a file so the script can find it
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > serviceAccountKey.json
