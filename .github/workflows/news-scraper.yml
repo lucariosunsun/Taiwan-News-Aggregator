@@ -32,9 +32,15 @@ jobs:
         continue-on-error: true # Allow proceeding even if Firebase upload fails
       - name: Run Targeted Search Scraper
         run: node scripts/search-related-news.js
+      - name: Export Website Topics (CSV)
+        run: node scripts/export-website-topics.js
+      - name: Update Google Sheet (Summary)
+        run: node scripts/update-topics-sheet.js
       - name: Upload Search Results
         uses: actions/upload-artifact@v4
         with:
-          name: related-news-csv
-          path: scraped-news-related/*.csv
+          name: news-data-csvs
+          path: |
+            scraped-news-related/*.csv
+            topic-exports/*.csv
           retention-days: 5
